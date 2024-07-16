@@ -1,6 +1,9 @@
 ﻿using System;
 using System.Net;
+using System.Threading;
+using System.Windows.Threading;
 using VideoOS.Platform;
+using VideoOS.Platform.Client;
 using VideoOS.Platform.Login;
 
 namespace MilestoneDriverExample
@@ -11,6 +14,9 @@ namespace MilestoneDriverExample
         private const string IntegrationName = "MilestoneDriverExample";
         private const string Version = "1.0";
         private const string ManufacturerName = "YourCompany";
+        private ImageViewerWpfControl _imageViewerControl;
+        private Thread _staThread;
+        private Dispatcher _dispatcher;
 
         public void Initialize()
         {
@@ -52,6 +58,48 @@ namespace MilestoneDriverExample
             // Get the list of cameras
             var allCameras = Configuration.Instance.GetItemsByKind(Kind.Camera);
             return allCameras.Count > 0 ? allCameras[0] : null;
+        }
+
+        public void StartLiveStreaming(Item camera)
+        {
+            _staThread = new Thread(() =>
+            {
+                _dispatcher = Dispatcher.CurrentDispatcher;
+
+                // Create ImageViewerControl to display video
+                _imageViewerControl = new ImageViewerWpfControl();
+                _imageViewerControl.CameraFQID = camera.FQID;
+                _imageViewerControl.Initialize();
+                _imageViewerControl.Connect();
+                _imageViewerControl.StartLive();
+                Console.WriteLine("Live streaming started.");
+
+                Dispatcher.Run();
+            });
+
+            _staThread.SetApartmentState(ApartmentState.STA);
+            _staThread.Start();
+        }
+
+        public void StopLiveStreaming()
+        {
+            if (_imageViewerControl != null && _dispatcher != null)
+            {
+                _dispatcher.Invoke(() =>
+                {
+                    _imageViewerControl.IsTabStop = true;
+                    _imageViewerControl.Disconnect();
+                    _imageViewerControl.Close();
+                    _imageViewerControl = null;
+                    Console.WriteLine("Live streaming stopped.");
+
+                    _dispatcher.InvokeShutdown();  // Shutdown the dispatcher to exit the thread
+                });
+
+                _staThread.Join();  // Wait for the STA thread to finish
+                _dispatcher = null;
+                _staThread = null;
+            }
         }
 
         public void Logout(string serverAddress)

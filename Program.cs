@@ -25,6 +25,12 @@ namespace ConsoleApp4
                 if (camera != null)
                 {
                     Console.WriteLine("Camera found: " + camera.Name);
+                    driver.StartLiveStreaming(camera);
+                    Console.WriteLine("Press any key to stop streaming...");
+                    Console.ReadKey();
+
+                    // Stop streaming
+                    driver.StopLiveStreaming();
                 }
                 else
                 {
